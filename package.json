@@ -1,0 +1,25 @@
+{
+  "name": "beerus-ai",
+  "version": "1.0.0",
+  "main": "beerus-ai.html",
+  "scripts": {
+    "start": "open beerus-ai.html"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Ch-Abdullah-Tahir/Beerus.AI.git"
+  },
+  "keywords": [
+    "ai",
+    "pathfinding",
+    "knowledge-based-agent",
+    "wumpus-world",
+    "beerus",
+    "cyberpunk",
+    "javascript",
+    "html"
+  ],
+  "author": "Ch-Abdullah-Tahir",
+  "license": "MIT",
+  "homepage": "https://github.com/Ch-Abdullah-Tahir/Beerus.AI#readme"
+}
