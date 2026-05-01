@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Beerus AI — Knowledge-Based Pathfinding Agent</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #1a0a1a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    .root {
+      background: #12080a;
+      width: 100%;
+      max-width: 620px;
+      font-family: 'Share Tech Mono', monospace;
+      overflow: hidden;
+      position: relative;
+      border-radius: 12px;
+      color: #d4c0cc;
+    }
+
+    .scanlines {
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(180,80,255,0.012) 2px, rgba(180,80,255,0.012) 4px);
+      pointer-events: none; z-index: 0;
+    }
+
+    .grid-bg {
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(rgba(160,60,220,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(160,60,220,0.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none; z-index: 0;
+    }
+
+    .content { position: relative; z-index: 2; padding: 2rem 2rem 1.5rem; }
+
+    /* Header */
+    .header { text-align: center; margin-bottom: 1.5rem; }
+
+    .agent-badge {
+      display: inline-block;
+      background: rgba(180,80,255,0.1);
+      border: 1px solid rgba(180,80,255,0.35);
+      color: #c060ff;
+      font-size: 11px;
+      letter-spacing: 3px;
+      padding: 4px 14px;
+      border-radius: 2px;
+      margin-bottom: 12px;
+      animation: badge-pulse 2.5s ease-in-out infinite;
+    }
+
+    @keyframes badge-pulse {
+      0%, 100% { opacity: 0.7; box-shadow: 0 0 6px rgba(180,80,255,0.2); }
+      50% { opacity: 1; box-shadow: 0 0 16px rgba(180,80,255,0.5); }
+    }
+
+    .main-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 3rem;
+      font-weight: 900;
+      letter-spacing: 8px;
+      color: #f0e0ff;
+      text-shadow: 0 0 30px rgba(160,80,255,0.3);
+      animation: title-flicker 6s ease-in-out infinite;
+    }
+
+    @keyframes title-flicker {
+      0%, 90%, 100% { opacity: 1; }
+      92% { opacity: 0.85; }
+      94% { opacity: 1; }
+      96% { opacity: 0.9; }
+    }
+
+    .title-accent {
+      color: #c060ff;
+      text-shadow: 0 0 20px rgba(180,80,255,0.5);
+    }
+
+    .subtitle {
+      font-size: 12px;
+      letter-spacing: 4px;
+      color: #5a3a5a;
+      margin-top: 6px;
+    }
+
+    /* Stats row */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 1.5rem;
+    }
+
+    .stat-card {
+      background: rgba(255,255,255,0.02);
+      border: 0.5px solid rgba(180,80,255,0.15);
+      border-top: 1.5px solid rgba(180,80,255,0.4);
+      border-radius: 4px;
+      padding: 12px 14px;
+      transition: all 0.3s ease;
+      cursor: default;
+    }
+    .stat-card:hover {
+      background: rgba(180,80,255,0.05);
+      border-color: rgba(180,80,255,0.4);
+      transform: translateY(-2px);
+    }
+    .stat-label { font-size: 10px; letter-spacing: 2px; color: #4a2a4a; margin-bottom: 4px; }
+    .stat-value {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #c060ff;
+    }
+    .stat-unit { font-size: 10px; color: #4a2a4a; margin-left: 4px; }
+
+    /* Section label */
+    .section-label {
+      font-size: 10px; letter-spacing: 3px; color: #4a2a4a;
+      margin-bottom: 10px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .section-label::after {
+      content: ''; flex: 1; height: 0.5px; background: rgba(180,80,255,0.12);
+    }
+
+    /* Agent grid */
+    .agent-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      margin-bottom: 1.5rem;
+    }
+
+    .grid-cell {
+      aspect-ratio: 1;
+      border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px;
+      font-family: 'Orbitron', sans-serif;
+      cursor: pointer;
+      border: 0.5px solid rgba(255,255,255,0.05);
+      background: rgba(255,255,255,0.02);
+      color: #4a2a4a;
+      transition: all 0.25s ease;
+      position: relative;
+      overflow: hidden;
+      user-select: none;
+    }
+    .grid-cell::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(circle at center, rgba(180,80,255,0.15), transparent 70%);
+      opacity: 0; transition: opacity 0.3s;
+    }
+    .grid-cell:hover::before { opacity: 1; }
+    .grid-cell:hover {
+      border-color: rgba(180,80,255,0.4);
+      color: #c060ff;
+      transform: scale(1.04);
+    }
+    .grid-cell.visited {
+      background: rgba(160,60,220,0.12);
+      border-color: rgba(160,60,220,0.45);
+      color: #c060ff;
+      animation: cell-activate 0.4s ease;
+    }
+    .grid-cell.start {
+      background: rgba(220,130,255,0.14);
+      border-color: rgba(220,130,255,0.55);
+      color: #e090ff;
+    }
+    .grid-cell.hazard {
+      background: rgba(200,40,80,0.14);
+      border-color: rgba(200,40,80,0.45);
+      color: #ff4060;
+      animation: hazard-flash 0.6s ease;
+    }
+    @keyframes cell-activate {
+      0% { transform: scale(0.9); opacity: 0.5; }
+      60% { transform: scale(1.06); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    @keyframes hazard-flash {
+      0%, 100% { background: rgba(200,40,80,0.14); }
+      50% { background: rgba(200,40,80,0.32); }
+    }
+
+    /* Log panel */
+    .log-panel {
+      background: rgba(0,0,0,0.4);
+      border: 0.5px solid rgba(180,80,255,0.1);
+      border-radius: 4px;
+      padding: 12px;
+      height: 90px;
+      overflow-y: auto;
+      font-size: 11px;
+      line-height: 1.8;
+      margin-bottom: 1.5rem;
+    }
+    .log-panel::-webkit-scrollbar { width: 3px; }
+    .log-panel::-webkit-scrollbar-thumb { background: rgba(180,80,255,0.2); }
+    .log-entry { animation: log-in 0.3s ease; }
+    @keyframes log-in {
+      from { opacity: 0; transform: translateX(-6px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    .log-ts { color: #3a1a3a; }
+    .log-ok { color: #c060ff; }
+    .log-warn { color: #ff8040; }
+    .log-info { color: #9060cc; }
+
+    /* Controls */
+    .controls-row { display: flex; gap: 10px; align-items: center; }
+
+    .beerus-btn {
+      background: transparent;
+      border: 0.5px solid rgba(180,80,255,0.35);
+      color: #c060ff;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 2px;
+      padding: 8px 16px;
+      border-radius: 2px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .beerus-btn:hover {
+      background: rgba(180,80,255,0.1);
+      border-color: rgba(180,80,255,0.65);
+      box-shadow: 0 0 12px rgba(180,80,255,0.2);
+      transform: translateY(-1px);
+    }
+    .beerus-btn:active { transform: scale(0.97); }
+
+    .percept-display {
+      flex: 1;
+      background: rgba(0,0,0,0.3);
+      border: 0.5px solid rgba(255,255,255,0.05);
+      border-radius: 2px;
+      padding: 8px 12px;
+      font-size: 11px;
+      color: #4a2a4a;
+      letter-spacing: 1px;
+    }
+    .percept-display span { color: #9060cc; }
+
+    /* Corner decorations */
+    .corner { position: absolute; width: 20px; height: 20px; }
+    .corner.tl { top: 10px; left: 10px; border-top: 1.5px solid #c060ff; border-left: 1.5px solid #c060ff; }
+    .corner.tr { top: 10px; right: 10px; border-top: 1.5px solid #c060ff; border-right: 1.5px solid #c060ff; }
+    .corner.bl { bottom: 10px; left: 10px; border-bottom: 1.5px solid #c060ff; border-left: 1.5px solid #c060ff; }
+    .corner.br { bottom: 10px; right: 10px; border-bottom: 1.5px solid #c060ff; border-right: 1.5px solid #c060ff; }
+
+    /* Orb / avatar */
+    .orb-wrap {
+      position: relative;
+      margin-bottom: 0.5rem;
+      height: 80px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .orb {
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 38% 36%, #d080ff 0%, #7020b0 60%, #2a0040 100%);
+      position: relative; z-index: 2;
+    }
+    .orb::after {
+      content: '';
+      position: absolute; inset: -6px;
+      border-radius: 50%;
+      border: 1px solid rgba(180,80,255,0.25);
+      border-top-color: rgba(220,140,255,0.7);
+      animation: spin 4s linear infinite;
+    }
+    .orb-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 0.5px solid transparent;
+    }
+    .orb-ring.r1 {
+      width: 90px; height: 90px;
+      border-color: rgba(180,80,255,0.12);
+      border-top-color: rgba(180,80,255,0.4);
+      animation: spin 7s linear infinite;
+    }
+    .orb-ring.r2 {
+      width: 120px; height: 120px;
+      border-color: rgba(120,40,200,0.07);
+      border-right-color: rgba(120,40,200,0.25);
+      animation: spin 11s linear infinite reverse;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .ear {
+      position: absolute;
+      width: 10px; height: 18px;
+      background: #7020b0;
+      border-radius: 5px 5px 0 0;
+      top: 16px;
+    }
+    .ear.left  { left: 8px;  transform: rotate(-12deg); }
+    .ear.right { right: 8px; transform: rotate(12deg); }
+  </style>
+</head>
+<body>
+
+<div class="root">
+  <div class="scanlines"></div>
+  <div class="grid-bg"></div>
+  <div class="corner tl"></div>
+  <div class="corner tr"></div>
+  <div class="corner bl"></div>
+  <div class="corner br"></div>
+
+  <div class="content">
+    <div class="header">
+      <div class="orb-wrap">
+        <div class="orb-ring r2"></div>
+        <div class="orb-ring r1"></div>
+        <div class="orb">
+          <div class="ear left"></div>
+          <div class="ear right"></div>
+        </div>
+      </div>
+      <div class="agent-badge">UNIT ONLINE</div>
+      <div class="main-title"><span class="title-accent">BEERUS</span> AI</div>
+      <div class="subtitle">KNOWLEDGE-BASED PATHFINDING AGENT</div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">INFERENCE</div>
+        <div class="stat-value" id="s-steps">0<span class="stat-unit">OPS</span></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">SAFE CELLS</div>
+        <div class="stat-value" id="s-safe">0<span class="stat-unit">PTS</span></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">STATUS</div>
+        <div class="stat-value" id="s-status" style="font-size:0.85rem;letter-spacing:2px;">READY</div>
+      </div>
+    </div>
+
+    <div class="section-label">ENVIRONMENT GRID — 4x4</div>
+    <div class="agent-grid" id="agent-grid"></div>
+
+    <div class="section-label">SYSTEM LOG</div>
+    <div class="log-panel" id="log-panel"></div>
+
+    <div class="controls-row">
+      <button class="beerus-btn" onclick="resetAgent()">REINIT</button>
+      <button class="beerus-btn" onclick="autoRun()">AUTO-RUN</button>
+      <div class="percept-display">PERCEPTS: <span id="percepts-display">NONE</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const ROWS = 4, COLS = 4;
+  let visited = new Set();
+  let safeCells = new Set();
+  let hazards = new Set();
+  let inferenceSteps = 0;
+  let agentPos = null;
+  let autoRunning = false;
+
+  function ts() {
+    const n = new Date();
+    return `[${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}:${String(n.getSeconds()).padStart(2,'0')}]`;
+  }
+
+  function log(msg, type = 'ok') {
+    const panel = document.getElementById('log-panel');
+    const entry = document.createElement('div');
+    entry.className = 'log-entry';
+    entry.innerHTML = `<span class="log-ts">${ts()}</span> <span class="log-${type}">${msg}</span>`;
+    panel.appendChild(entry);
+    panel.scrollTop = panel.scrollHeight;
+  }
+
+  function buildGrid() {
+    const grid = document.getElementById('agent-grid');
+    grid.innerHTML = '';
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const cell = document.createElement('div');
+        cell.className = 'grid-cell';
+        cell.id = `cell-${r}-${c}`;
+        cell.textContent = `${r},${c}`;
+        cell.onclick = () => moveAgent(r, c);
+        grid.appendChild(cell);
+      }
+    }
+  }
+
+  function placeHazards() {
+    hazards.clear();
+    const candidates = [];
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++)
+        if (!(r === 0 && c === 0)) candidates.push(`${r},${c}`);
+    for (let i = 0; i < 3; i++) {
+      const idx = Math.floor(Math.random() * candidates.length);
+      hazards.add(candidates.splice(idx, 1)[0]);
+    }
+  }
+
+  function updateStats() {
+    document.getElementById('s-steps').innerHTML = `${inferenceSteps}<span class="stat-unit">OPS</span>`;
+    document.getElementById('s-safe').innerHTML = `${safeCells.size}<span class="stat-unit">PTS</span>`;
+  }
+
+  function getCellEl(r, c) {
+    return document.getElementById(`cell-${r}-${c}`);
+  }
+
+  function computeSafe(r, c) {
+    [[r-1,c],[r+1,c],[r,c-1],[r,c+1]].forEach(([nr, nc]) => {
+      if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) {
+        const key = `${nr},${nc}`;
+        if (!hazards.has(key) && !safeCells.has(key) && !visited.has(key)) {
+          safeCells.add(key);
+          const el = getCellEl(nr, nc);
+          if (el && !el.classList.contains('visited')) el.classList.add('visited');
+        }
+      }
+    });
+  }
+
+  function getPercepts(r, c) {
+    const percepts = [];
+    let nearHazard = false;
+    [[r-1,c],[r+1,c],[r,c-1],[r,c+1]].forEach(([nr, nc]) => {
+      if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS)
+        if (hazards.has(`${nr},${nc}`)) nearHazard = true;
+    });
+    if (nearHazard) percepts.push('STENCH');
+    if (r === ROWS - 1 && c === COLS - 1) percepts.push('GOAL');
+    return percepts;
+  }
+
+  function moveAgent(r, c) {
+    const key = `${r},${c}`;
+    if (agentPos) {
+      const [pr, pc] = agentPos;
+      const prevEl = getCellEl(pr, pc);
+      if (prevEl) {
+        prevEl.classList.remove('start');
+        prevEl.classList.add('visited');
+        prevEl.textContent = `${pr},${pc}`;
+      }
+    }
+
+    inferenceSteps += Math.floor(Math.random() * 3) + 1;
+
+    if (hazards.has(key)) {
+      const el = getCellEl(r, c);
+      el.classList.add('hazard');
+      el.textContent = '!';
+      log(`HAZARD at (${r},${c}) — agent terminated`, 'warn');
+      document.getElementById('s-status').textContent = 'DEAD';
+      document.getElementById('percepts-display').textContent = 'TERMINATED';
+      updateStats();
+      autoRunning = false;
+      return;
+    }
+
+    agentPos = [r, c];
+    visited.add(key);
+    const el = getCellEl(r, c);
+    el.className = 'grid-cell start';
+    el.textContent = 'AGT';
+
+    computeSafe(r, c);
+    const percepts = getPercepts(r, c);
+    updateStats();
+
+    document.getElementById('percepts-display').textContent = percepts.length ? percepts.join(' + ') : 'NONE';
+    document.getElementById('s-status').innerHTML = percepts.includes('GOAL')
+      ? '<span style="color:#c060ff">GOAL</span>'
+      : 'ACTIVE';
+
+    log(`Moved to (${r},${c}) — percepts: ${percepts.length ? percepts.join(', ') : 'none'}`,
+      percepts.includes('STENCH') ? 'warn' : 'info');
+
+    if (percepts.includes('GOAL')) {
+      log('GOAL reached — divine will fulfilled', 'ok');
+      autoRunning = false;
+    }
+  }
+
+  function resetAgent() {
+    visited.clear(); safeCells.clear(); hazards.clear();
+    inferenceSteps = 0; agentPos = null; autoRunning = false;
+    document.getElementById('percepts-display').textContent = 'NONE';
+    document.getElementById('s-status').textContent = 'READY';
+    updateStats();
+    buildGrid();
+    placeHazards();
+    log('System reinitialised — new environment loaded', 'ok');
+    setTimeout(() => moveAgent(0, 0), 300);
+  }
+
+  function autoRun() {
+    if (autoRunning) { autoRunning = false; return; }
+    autoRunning = true;
+    log('Auto-run engaged — navigating safe cells...', 'info');
+    function step() {
+      if (!autoRunning || !agentPos) return;
+      const safe = [...safeCells].filter(k => !visited.has(k));
+      if (!safe.length) { autoRunning = false; log('No safe frontier — divine patience exhausted', 'warn'); return; }
+      const [nr, nc] = safe[Math.floor(Math.random() * safe.length)].split(',').map(Number);
+      moveAgent(nr, nc);
+      if (autoRunning) setTimeout(step, 900);
+    }
+    setTimeout(step, 900);
+  }
+
+  buildGrid();
+  placeHazards();
+  log('Beerus AI v1.0 — God of Destruction online', 'ok');
+  log('Environment generated: 4x4 grid with 3 hazards', 'info');
+  setTimeout(() => moveAgent(0, 0), 400);
+</script>
+
+</body>
+</html>

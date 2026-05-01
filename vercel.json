@@ -1,0 +1,26 @@
+{
+  "name": "beerus-ai",
+  "version": "1.0.0",
+  "description": "Beerus AI — A knowledge-based pathfinding agent with a cyberpunk purple UI inspired by the God of Destruction.",
+  "main": "beerus-ai.html",
+  "scripts": {
+    "start": "open beerus-ai.html"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR_USERNAME/beerus-ai.git"
+  },
+  "keywords": [
+    "ai",
+    "pathfinding",
+    "knowledge-based-agent",
+    "wumpus-world",
+    "beerus",
+    "cyberpunk",
+    "javascript",
+    "html"
+  ],
+  "author": "YOUR_NAME",
+  "license": "MIT",
+  "homepage": "https://github.com/YOUR_USERNAME/beerus-ai#readme"
+}
